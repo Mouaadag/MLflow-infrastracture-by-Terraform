@@ -52,14 +52,6 @@ resource "aws_security_group" "mlflow_app" {
   }
 
   ingress {
-    description     = "HTTP from ALB (nginx)"
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
     description     = "MLflow from ALB"
     from_port       = 5000
     to_port         = 5000
@@ -239,6 +231,32 @@ resource "aws_iam_policy" "mlflow_ssm_policy" {
   tags = var.common_tags
 }
 
+# IAM Policy for KMS access
+resource "aws_iam_policy" "mlflow_kms_policy" {
+  name_prefix = "${var.name_prefix}-mlflow-kms"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
+        ]
+        Resource = aws_kms_key.mlflow.arn
+      }
+    ]
+  })
+
+  tags = var.common_tags
+}
+
 # Attach policies to role
 resource "aws_iam_role_policy_attachment" "mlflow_s3_policy_attachment" {
   role       = aws_iam_role.mlflow_instance_role.name
@@ -253,6 +271,12 @@ resource "aws_iam_role_policy_attachment" "mlflow_cloudwatch_policy_attachment" 
 resource "aws_iam_role_policy_attachment" "mlflow_ssm_policy_attachment" {
   role       = aws_iam_role.mlflow_instance_role.name
   policy_arn = aws_iam_policy.mlflow_ssm_policy.arn
+}
+
+# Attach KMS policy to role
+resource "aws_iam_role_policy_attachment" "mlflow_kms_policy_attachment" {
+  role       = aws_iam_role.mlflow_instance_role.name
+  policy_arn = aws_iam_policy.mlflow_kms_policy.arn
 }
 
 # Attach AWS managed policy for SSM

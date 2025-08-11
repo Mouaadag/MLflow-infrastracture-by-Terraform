@@ -149,7 +149,7 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 # ALB Target Group
 resource "aws_lb_target_group" "mlflow" {
   name     = "${var.name_prefix}-tg"
-  port     = 5000
+  port     = 80
   protocol = "HTTP"
   vpc_id   = var.vpc_id
 
@@ -161,7 +161,7 @@ resource "aws_lb_target_group" "mlflow" {
     interval            = 30
     path                = "/health"
     matcher             = "200"
-    port                = "traffic-port"
+    port                = "80"
     protocol            = "HTTP"
   }
 
