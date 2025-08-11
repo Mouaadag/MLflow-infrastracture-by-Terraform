@@ -1,3 +1,6 @@
+# Data sources
+data "aws_region" "current" {}
+
 # Application Load Balancer Security Group
 resource "aws_security_group" "alb" {
   name_prefix = "${var.name_prefix}-alb"
@@ -281,6 +284,29 @@ resource "aws_kms_key" "mlflow" {
           "kms:DescribeKey"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs to use the key"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = [
+              "arn:aws:logs:${data.aws_region.current.name}:${var.account_id}:log-group:/aws/elasticache/*",
+              "arn:aws:logs:${data.aws_region.current.name}:${var.account_id}:log-group:/aws/ec2/mlflow/*"
+            ]
+          }
+        }
       }
     ]
   })

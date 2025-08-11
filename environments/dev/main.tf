@@ -101,7 +101,7 @@ module "database" {
 
 	name_prefix                 = local.name_prefix
 	engine                      = "mysql"
-	engine_version              = "8.0.35"
+	engine_version              = "8.0.43"
 	instance_class              = "db.t3.micro"
 	allocated_storage           = 20
 	max_allocated_storage       = 100
@@ -118,7 +118,7 @@ module "database" {
 	monitoring_interval         = 0
 	performance_insights_enabled = false
 	deletion_protection         = false
-	kms_key_id                  = module.security.kms_key_id
+	kms_key_id                  = module.security.kms_key_arn
 
 	enable_elasticache          = true
 	cache_node_type             = "cache.t3.micro"
@@ -146,7 +146,7 @@ module "mlflow" {
 	alb_security_group_id  = module.security.alb_security_group_id
 	app_security_group_id  = module.security.mlflow_app_security_group_id
 	ami_id                 = data.aws_ami.amazon_linux.id
-	instance_type          = "t3.medium"
+	instance_type          = "t3.micro"
 	key_name               = aws_key_pair.mlflow_key.key_name
 	instance_profile_name  = module.security.mlflow_instance_profile_name
 	min_capacity           = 1
@@ -160,7 +160,7 @@ module "mlflow" {
 	vault_token            = var.vault_token
 	enable_https           = false
 	ssl_certificate_arn    = ""
-	kms_key_id             = module.security.kms_key_id
+	kms_key_id             = module.security.kms_key_arn
 	enable_deletion_protection = false
 	log_retention_days     = 30
 	common_tags            = local.common_tags
@@ -170,7 +170,7 @@ module "mlflow" {
 
 resource "aws_sns_topic" "alerts" {
 	name              = "${local.name_prefix}-alerts"
-	kms_master_key_id = module.security.kms_key_id
+	kms_master_key_id = module.security.kms_key_arn
 	tags = local.common_tags
 }
 
