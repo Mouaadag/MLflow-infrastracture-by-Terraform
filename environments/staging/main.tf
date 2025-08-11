@@ -4,7 +4,26 @@ terraform {
 
     workspaces {
       name = "mlflow-staging"
-    }
+  	engine_version              = "8.0.43"
+	instance_class              = "db.t3.small"}
+  }
+
+  # Force CLI-driven workflow to upload files
+  required_version = ">= 1.5"
+}
+
+# Create SSH key pair for EC2 instances
+resource "tls_private_key" "mlflow_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_key_pair" "mlflow_key" {
+  key_name   = "${var.project_name}-${local.environment}-key"
+  public_key = tls_private_key.mlflow_key.public_key_openssh
+
+  tags = {
+    Name = "${var.project_name}-${local.environment}-keypair"
   }
 }
 

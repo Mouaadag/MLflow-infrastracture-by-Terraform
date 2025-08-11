@@ -278,7 +278,7 @@ resource "aws_autoscaling_group" "mlflow" {
   vpc_zone_identifier = var.private_subnet_ids
   target_group_arns   = [aws_lb_target_group.mlflow.arn]
   health_check_type   = "ELB"
-  health_check_grace_period = 300
+  health_check_grace_period = 600
 
   min_size         = var.min_capacity
   max_size         = var.max_capacity
