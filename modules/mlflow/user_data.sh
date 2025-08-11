@@ -53,10 +53,20 @@ pip3 install --upgrade pip setuptools wheel
 pip3 install mlflow==2.8.1 boto3==1.34.0 pymysql==1.1.0 redis==5.0.1 gunicorn==21.2.0
 
 # Get database password from SSM Parameter Store (more reliable than Vault for this use case)
+echo "Retrieving database password from SSM..."
 DB_PASSWORD=$(aws ssm get-parameter --name "/$NAME_PREFIX/database/password" --with-decryption --query 'Parameter.Value' --output text)
+
+if [ -z "$DB_PASSWORD" ]; then
+    echo "ERROR: Failed to retrieve database password from SSM"
+    exit 1
+fi
+
+echo "Database password retrieved successfully"
 
 # Replace PASSWORD placeholder in connection string
 ACTUAL_DB_CONNECTION_STRING=$(echo "$DB_CONNECTION_STRING" | sed "s/PASSWORD/$DB_PASSWORD/g")
+
+echo "Database connection string configured"
 
 # Create MLflow startup script
 cat > /opt/mlflow/start_mlflow.sh << EOF
@@ -75,6 +85,47 @@ EOF
 
 chmod +x /opt/mlflow/start_mlflow.sh
 chown mlflow:mlflow /opt/mlflow/start_mlflow.sh
+
+# Test database connection before proceeding
+echo "Testing database connection..."
+python3 -c "
+import pymysql
+import sys
+import os
+
+try:
+    # Parse connection string to get components
+    conn_str = '$ACTUAL_DB_CONNECTION_STRING'
+    # Extract components from mysql+pymysql://user:pass@host:port/db
+    import re
+    pattern = r'mysql\+pymysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
+    match = re.match(pattern, conn_str)
+    if not match:
+        print('Failed to parse connection string')
+        sys.exit(1)
+    
+    user, password, host, port, database = match.groups()
+    port = int(port)
+    
+    print(f'Connecting to {host}:{port} as {user}')
+    connection = pymysql.connect(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=database
+    )
+    connection.close()
+    print('Database connection successful!')
+except Exception as e:
+    print(f'Database connection failed: {e}')
+    sys.exit(1)
+"
+
+if [ $? -ne 0 ]; then
+    echo "ERROR: Database connection test failed. Exiting."
+    exit 1
+fi
 
 # Create systemd service for MLflow
 cat > /etc/systemd/system/mlflow.service << EOF
@@ -178,23 +229,18 @@ EOF
 # Start and enable services
 systemctl daemon-reload
 
-# Start nginx first
-systemctl enable nginx
-systemctl start nginx
-
-# Start CloudWatch agent
+# Start CloudWatch agent first
 systemctl enable amazon-cloudwatch-agent
 systemctl start amazon-cloudwatch-agent
 
-# Wait a moment then start MLflow
-sleep 5
+# Start MLflow
 systemctl enable mlflow
 systemctl start mlflow
 
-# Wait for MLflow to start
+# Wait for MLflow to be ready before starting nginx
 echo "Waiting for MLflow to start..."
 for i in {1..30}; do
-    if curl -f http://localhost:5000/health > /dev/null 2>&1; then
+    if curl -f http://localhost:5000/api/2.0/mlflow/experiments/list > /dev/null 2>&1; then
         echo "MLflow is running"
         break
     fi
@@ -202,10 +248,30 @@ for i in {1..30}; do
     sleep 10
 done
 
+# Now start nginx
+systemctl enable nginx
+systemctl start nginx
+
+# Test the health endpoint through nginx
+echo "Testing health endpoint..."
+for i in {1..10}; do
+    if curl -f http://localhost:80/health > /dev/null 2>&1; then
+        echo "Health endpoint is working"
+        break
+    fi
+    echo "Attempt $i: Health endpoint not ready yet, waiting..."
+    sleep 5
+done
+
 # Final status check
 echo "Final service status:"
-systemctl status nginx --no-pager
-systemctl status mlflow --no-pager
-systemctl status amazon-cloudwatch-agent --no-pager
+systemctl status nginx --no-pager || echo "Nginx status failed"
+systemctl status mlflow --no-pager || echo "MLflow status failed"
+systemctl status amazon-cloudwatch-agent --no-pager || echo "CloudWatch agent status failed"
+
+# Test final connectivity
+echo "Final connectivity tests:"
+curl -I http://localhost:80/health || echo "Health check failed"
+curl -f http://localhost:5000/api/2.0/mlflow/experiments/list > /dev/null 2>&1 && echo "MLflow API working" || echo "MLflow API check failed"
 
 echo "MLflow server setup completed successfully"

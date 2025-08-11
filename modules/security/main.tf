@@ -44,6 +44,22 @@ resource "aws_security_group" "mlflow_app" {
   vpc_id      = var.vpc_id
 
   ingress {
+    description     = "HTTP from ALB (nginx)"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "HTTP from ALB (nginx)"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
     description     = "MLflow from ALB"
     from_port       = 5000
     to_port         = 5000
@@ -307,6 +323,40 @@ resource "aws_kms_key" "mlflow" {
             ]
           }
         }
+      },
+      {
+        Sid    = "Allow Auto Scaling service to use the key for EBS encryption"
+        Effect = "Allow"
+        Principal = {
+          Service = "autoscaling.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow EC2 service to use the key for EBS encryption"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
+        ]
+        Resource = "*"
       }
     ]
   })

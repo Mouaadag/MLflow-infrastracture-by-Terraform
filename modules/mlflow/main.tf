@@ -156,8 +156,8 @@ resource "aws_lb_target_group" "mlflow" {
   health_check {
     enabled             = true
     healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
+    unhealthy_threshold = 3
+    timeout             = 10
     interval            = 30
     path                = "/health"
     matcher             = "200"
@@ -278,7 +278,7 @@ resource "aws_autoscaling_group" "mlflow" {
   vpc_zone_identifier = var.private_subnet_ids
   target_group_arns   = [aws_lb_target_group.mlflow.arn]
   health_check_type   = "ELB"
-  health_check_grace_period = 600
+  health_check_grace_period = 1200  # 20 minutes to allow for full setup
 
   min_size         = var.min_capacity
   max_size         = var.max_capacity

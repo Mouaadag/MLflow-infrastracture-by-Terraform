@@ -57,7 +57,7 @@ output "elasticache_replication_group_id" {
 }
 
 output "database_connection_string" {
-  description = "Database connection string for MLflow"
-  value       = "${var.engine}+pymysql://${aws_db_instance.mlflow.username}:${var.database_password != null ? var.database_password : random_password.db_password.result}@${aws_db_instance.mlflow.endpoint}:${aws_db_instance.mlflow.port}/${aws_db_instance.mlflow.db_name}"
+  description = "Database connection string for MLflow with PASSWORD placeholder"
+  value       = "${var.engine}+pymysql://${aws_db_instance.mlflow.username}:PASSWORD@${aws_db_instance.mlflow.endpoint}:${aws_db_instance.mlflow.port}/${aws_db_instance.mlflow.db_name}"
   sensitive   = true
 }
