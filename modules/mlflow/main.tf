@@ -238,7 +238,7 @@ resource "aws_launch_template" "mlflow" {
   }))
 
   block_device_mappings {
-    device_name = "/dev/sda1"
+    device_name = "/dev/xvda"  # Updated for Amazon Linux 2023
     ebs {
       volume_type           = "gp3"
       volume_size           = 30
@@ -278,7 +278,7 @@ resource "aws_autoscaling_group" "mlflow" {
   vpc_zone_identifier = var.private_subnet_ids
   target_group_arns   = [aws_lb_target_group.mlflow.arn]
   health_check_type   = "ELB"
-  health_check_grace_period = 1200  # 20 minutes to allow for full setup
+  health_check_grace_period = 900  # 15 minutes (reduced from 20 since AL2023 boots faster)
 
   min_size         = var.min_capacity
   max_size         = var.max_capacity

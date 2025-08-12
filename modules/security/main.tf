@@ -309,10 +309,27 @@ resource "aws_kms_key" "mlflow" {
         Resource = "*"
       },
       {
-        Sid    = "AllowMLflowInstanceRole"
+        Sid    = "AllowAutoScalingServiceLinkedRole"
         Effect = "Allow"
         Principal = {
-          AWS = aws_iam_role.mlflow_instance_role.arn
+          AWS = "arn:aws:iam::${var.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowEC2Service"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
         }
         Action = [
           "kms:Encrypt",
@@ -341,10 +358,10 @@ resource "aws_kms_key" "mlflow" {
         Resource = "*"
       },
       {
-        Sid    = "AllowAutoScalingService"
+        Sid    = "AllowMLflowInstanceRole"
         Effect = "Allow"
         Principal = {
-          Service = "autoscaling.amazonaws.com"
+          AWS = aws_iam_role.mlflow_instance_role.arn
         }
         Action = [
           "kms:Encrypt",
@@ -356,31 +373,25 @@ resource "aws_kms_key" "mlflow" {
           "kms:CreateGrant"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "ec2.${data.aws_region.current.name}.amazonaws.com"
-          }
-        }
       },
       {
-        Sid    = "AllowEC2Service"
+        Sid    = "AllowAttachmentOfPersistentResources"
         Effect = "Allow"
         Principal = {
-          Service = "ec2.amazonaws.com"
+          AWS = [
+            aws_iam_role.mlflow_instance_role.arn,
+            "arn:aws:iam::${var.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling"
+          ]
         }
         Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:GenerateDataKeyWithoutPlaintext",
-          "kms:DescribeKey",
-          "kms:CreateGrant"
+          "kms:CreateGrant",
+          "kms:ListGrants",
+          "kms:RevokeGrant"
         ]
         Resource = "*"
         Condition = {
-          StringEquals = {
-            "kms:ViaService" = "ec2.${data.aws_region.current.name}.amazonaws.com"
+          Bool = {
+            "kms:GrantIsForAWSResource" = "true"
           }
         }
       }
