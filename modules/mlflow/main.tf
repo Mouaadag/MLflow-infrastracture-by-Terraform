@@ -18,7 +18,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "mlflow_artifacts"
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = var.kms_key_id
+      kms_master_key_id = var.kms_key_arn
     }
     bucket_key_enabled = true
   }
@@ -243,7 +243,7 @@ resource "aws_launch_template" "mlflow" {
       volume_type           = "gp3"
       volume_size           = 30
       encrypted             = true
-      kms_key_id           = var.kms_key_id
+      kms_key_id           = var.kms_key_arn
       delete_on_termination = true
     }
   }
@@ -382,7 +382,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
 resource "aws_cloudwatch_log_group" "mlflow" {
   name              = "/aws/ec2/mlflow/${var.name_prefix}"
   retention_in_days = var.log_retention_days
-  kms_key_id        = var.kms_key_id
+  kms_key_id        = var.kms_key_arn
 
   tags = var.common_tags
 }

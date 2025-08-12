@@ -118,7 +118,7 @@ module "database" {
 	monitoring_interval         = 0
 	performance_insights_enabled = false
 	deletion_protection         = false
-	kms_key_id                  = module.security.kms_key_id
+	kms_key_id                  = module.security.kms_key_arn
 
 	enable_elasticache          = true
 	cache_node_type             = "cache.t3.micro"
@@ -161,6 +161,7 @@ module "mlflow" {
 	enable_https           = false
 	ssl_certificate_arn    = ""
 	kms_key_id             = module.security.kms_key_id
+	kms_key_arn            = module.security.kms_key_arn
 	enable_deletion_protection = false
 	log_retention_days     = 30
 	common_tags            = local.common_tags
@@ -170,7 +171,7 @@ module "mlflow" {
 
 resource "aws_sns_topic" "alerts" {
 	name              = "${local.name_prefix}-alerts"
-	kms_master_key_id = module.security.kms_key_id
+	kms_master_key_id = module.security.kms_key_arn
 	tags = local.common_tags
 }
 

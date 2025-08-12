@@ -138,6 +138,11 @@ variable "kms_key_id" {
   type        = string
 }
 
+variable "kms_key_arn" {
+  description = "KMS key ARN for services that require ARN"
+  type        = string
+}
+
 variable "enable_deletion_protection" {
   description = "Enable deletion protection for ALB"
   type        = bool

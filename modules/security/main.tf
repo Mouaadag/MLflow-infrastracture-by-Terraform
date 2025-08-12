@@ -206,7 +206,7 @@ resource "aws_iam_policy" "mlflow_cloudwatch_policy" {
   tags = var.common_tags
 }
 
-# IAM Policy for Systems Manager (for secure access)
+# IAM Policy for Systems Manager
 resource "aws_iam_policy" "mlflow_ssm_policy" {
   name_prefix = "${var.name_prefix}-mlflow-ssm"
 
@@ -273,13 +273,11 @@ resource "aws_iam_role_policy_attachment" "mlflow_ssm_policy_attachment" {
   policy_arn = aws_iam_policy.mlflow_ssm_policy.arn
 }
 
-# Attach KMS policy to role
 resource "aws_iam_role_policy_attachment" "mlflow_kms_policy_attachment" {
   role       = aws_iam_role.mlflow_instance_role.name
   policy_arn = aws_iam_policy.mlflow_kms_policy.arn
 }
 
-# Attach AWS managed policy for SSM
 resource "aws_iam_role_policy_attachment" "mlflow_ssm_managed_policy" {
   role       = aws_iam_role.mlflow_instance_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -302,7 +300,7 @@ resource "aws_kms_key" "mlflow" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "Enable IAM User Permissions"
+        Sid    = "EnableRootPermissions"
         Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.account_id}:root"
@@ -311,7 +309,7 @@ resource "aws_kms_key" "mlflow" {
         Resource = "*"
       },
       {
-        Sid    = "Allow MLflow service to use the key"
+        Sid    = "AllowMLflowInstanceRole"
         Effect = "Allow"
         Principal = {
           AWS = aws_iam_role.mlflow_instance_role.arn
@@ -321,12 +319,14 @@ resource "aws_kms_key" "mlflow" {
           "kms:Decrypt",
           "kms:ReEncrypt*",
           "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
         ]
         Resource = "*"
       },
       {
-        Sid    = "Allow CloudWatch Logs to use the key"
+        Sid    = "AllowCloudWatchLogs"
         Effect = "Allow"
         Principal = {
           Service = "logs.${data.aws_region.current.name}.amazonaws.com"
@@ -339,17 +339,9 @@ resource "aws_kms_key" "mlflow" {
           "kms:DescribeKey"
         ]
         Resource = "*"
-        Condition = {
-          ArnLike = {
-            "kms:EncryptionContext:aws:logs:arn" = [
-              "arn:aws:logs:${data.aws_region.current.name}:${var.account_id}:log-group:/aws/elasticache/*",
-              "arn:aws:logs:${data.aws_region.current.name}:${var.account_id}:log-group:/aws/ec2/mlflow/*"
-            ]
-          }
-        }
       },
       {
-        Sid    = "Allow Auto Scaling service to use the key for EBS encryption"
+        Sid    = "AllowAutoScalingService"
         Effect = "Allow"
         Principal = {
           Service = "autoscaling.amazonaws.com"
@@ -364,9 +356,14 @@ resource "aws_kms_key" "mlflow" {
           "kms:CreateGrant"
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ec2.${data.aws_region.current.name}.amazonaws.com"
+          }
+        }
       },
       {
-        Sid    = "Allow EC2 service to use the key for EBS encryption"
+        Sid    = "AllowEC2Service"
         Effect = "Allow"
         Principal = {
           Service = "ec2.amazonaws.com"
@@ -381,6 +378,11 @@ resource "aws_kms_key" "mlflow" {
           "kms:CreateGrant"
         ]
         Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ec2.${data.aws_region.current.name}.amazonaws.com"
+          }
+        }
       }
     ]
   })
