@@ -4,8 +4,7 @@ terraform {
 
     workspaces {
       name = "mlflow-staging"
-  	engine_version              = "8.0.43"
-	instance_class              = "db.t3.small"}
+    }
   }
 
   # Force CLI-driven workflow to upload files
@@ -28,175 +27,173 @@ resource "aws_key_pair" "mlflow_key" {
 }
 
 locals {
-  environment = "staging"
-  name_prefix = "${var.project_name}-${local.environment}"
+	environment = "staging"
+	name_prefix = "${var.project_name}-${local.environment}"
 
-  common_tags = {
-    Environment = local.environment
-    Project     = var.project_name
-    ManagedBy   = "Terraform"
-    Owner       = var.owner
-    CostCenter  = "staging"
-  }
+	common_tags = {
+		Environment = local.environment
+		Project     = var.project_name
+		ManagedBy   = "Terraform"
+		Owner       = var.owner
+		CostCenter  = "staging"
+	}
 }
 
-# Data sources
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
-
 data "aws_availability_zones" "available" { state = "available" }
-
 data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
+	most_recent = true
+	owners      = ["amazon"]
+
+	filter {
+		name   = "name"
+		values = ["al2023-ami-*-x86_64"]
+	}
+
+	filter {
+		name   = "virtualization-type"
+		values = ["hvm"]
+	}
 }
 
 module "networking" {
-  source = "../../modules/networking"
+	source = "../../modules/networking"
 
-  name_prefix      = local.name_prefix
-  vpc_cidr         = var.vpc_cidr
-  azs              = slice(data.aws_availability_zones.available.names, 0, 2)
-  public_subnets   = ["10.1.1.0/24", "10.1.2.0/24"]
-  private_subnets  = ["10.1.11.0/24", "10.1.12.0/24"]
-  database_subnets = ["10.1.21.0/24", "10.1.22.0/24"]
+	name_prefix      = local.name_prefix
+	vpc_cidr         = var.vpc_cidr
+	azs              = slice(data.aws_availability_zones.available.names, 0, 2)
+	public_subnets   = ["10.1.1.0/24", "10.1.2.0/24"]
+	private_subnets  = ["10.1.11.0/24", "10.1.12.0/24"]
+	database_subnets = ["10.1.21.0/24", "10.1.22.0/24"]
 
-  enable_nat_gateway   = true
-  enable_vpc_endpoints = true
-  region               = data.aws_region.current.name
+	enable_nat_gateway   = true
+	enable_vpc_endpoints = true
+	region               = data.aws_region.current.name
 
-  common_tags = local.common_tags
+	common_tags = local.common_tags
 }
 
 resource "random_id" "bucket_suffix" { byte_length = 4 }
 
 module "security" {
-  source = "../../modules/security"
+	source = "../../modules/security"
 
-  name_prefix          = local.name_prefix
-  vpc_id               = module.networking.vpc_id
-  s3_bucket_arn        = "arn:aws:s3:::${local.name_prefix}-artifacts-${random_id.bucket_suffix.hex}"
-  database_port        = 3306
-  allowed_cidr_blocks  = var.allowed_cidr_blocks
-  account_id           = data.aws_caller_identity.current.account_id
-  kms_deletion_window  = 7
+	name_prefix          = local.name_prefix
+	vpc_id               = module.networking.vpc_id
+	s3_bucket_arn        = "arn:aws:s3:::${local.name_prefix}-artifacts-${random_id.bucket_suffix.hex}"
+	database_port        = 3306
+	allowed_cidr_blocks  = var.allowed_cidr_blocks
+	account_id           = data.aws_caller_identity.current.account_id
+	kms_deletion_window  = 7
 
-  common_tags = local.common_tags
+	common_tags = local.common_tags
 
-  depends_on = [module.networking]
+	depends_on = [module.networking]
 }
 
 data "vault_generic_secret" "database" { path = "secret/staging/database" }
-
 data "vault_generic_secret" "cache" { path = "secret/staging/cache" }
-
 data "vault_generic_secret" "monitoring" { path = "secret/staging/monitoring" }
 
 module "database" {
-  source = "../../modules/database"
+	source = "../../modules/database"
 
-  name_prefix                 = local.name_prefix
-  engine                      = "mysql"
-  engine_version              = "8.0.35"
-  instance_class              = "db.t3.small"
-  allocated_storage           = 40
-  max_allocated_storage       = 200
-  storage_type                = "gp3"
-  database_name               = "mlflow"
-  database_username           = "mlflow_admin"
-  database_password           = data.vault_generic_secret.database.data["password"]
-  db_subnet_group_name        = module.networking.database_subnet_group_name
-  security_group_id           = module.security.database_security_group_id
-  multi_az                    = true
-  backup_retention_period     = 14
-  backup_window               = "03:00-05:00"
-  maintenance_window          = "Sun:05:00-Sun:07:00"
-  monitoring_interval         = 0
-  performance_insights_enabled = false
-  deletion_protection         = true
-  kms_key_id                  = module.security.kms_key_id
+	name_prefix                 = local.name_prefix
+	engine                      = "mysql"
+	engine_version              = "8.0.43"
+	instance_class              = "db.t3.small"
+	allocated_storage           = 40
+	max_allocated_storage       = 200
+	storage_type                = "gp3"
+	database_name               = "mlflow"
+	database_username           = "mlflow_admin"
+	database_password           = data.vault_generic_secret.database.data["password"]
+	db_subnet_group_name        = module.networking.database_subnet_group_name
+	security_group_id           = module.security.database_security_group_id
+	multi_az                    = true
+	backup_retention_period     = 14
+	backup_window               = "03:00-05:00"
+	maintenance_window          = "Sun:05:00-Sun:07:00"
+	monitoring_interval         = 0
+	performance_insights_enabled = false
+	deletion_protection         = true
+	kms_key_id                  = module.security.kms_key_arn
 
-  enable_elasticache          = true
-  cache_node_type             = "cache.t3.small"
-  cache_num_nodes             = 2
-  cache_subnet_ids            = module.networking.private_subnet_ids
-  cache_security_group_id     = module.security.elasticache_security_group_id
-  cache_auth_token            = data.vault_generic_secret.cache.data["auth_token"]
-  cache_snapshot_retention    = 7
+	enable_elasticache          = true
+	cache_node_type             = "cache.t3.small"
+	cache_num_nodes             = 2
+	cache_subnet_ids            = module.networking.private_subnet_ids
+	cache_security_group_id     = module.security.elasticache_security_group_id
+	cache_auth_token            = data.vault_generic_secret.cache.data["auth_token"]
+	cache_snapshot_retention    = 7
 
-  log_retention_days          = 30
-  common_tags                 = local.common_tags
+	log_retention_days          = 30
+	common_tags                 = local.common_tags
 
-  depends_on = [module.networking, module.security]
+	depends_on = [module.networking, module.security]
 }
 
 module "mlflow" {
-  source = "../../modules/mlflow"
+	source = "../../modules/mlflow"
 
-  name_prefix            = local.name_prefix
-  environment            = local.environment
-  aws_region             = data.aws_region.current.name
-  vpc_id                 = module.networking.vpc_id
-  public_subnet_ids      = module.networking.public_subnet_ids
-  private_subnet_ids     = module.networking.private_subnet_ids
-  alb_security_group_id  = module.security.alb_security_group_id
-  app_security_group_id  = module.security.mlflow_app_security_group_id
-  ami_id                 = data.aws_ami.amazon_linux.id
-  instance_type          = "t3.large"
-  key_name               = var.key_name
-  instance_profile_name  = module.security.mlflow_instance_profile_name
-  min_capacity           = 2
-  max_capacity           = 4
-  desired_capacity       = 2
-  s3_bucket_name         = "${local.name_prefix}-artifacts-${random_id.bucket_suffix.hex}"
-  database_connection_string = module.database.database_connection_string
-  elasticache_endpoint   = module.database.elasticache_endpoint
-  elasticache_port       = module.database.elasticache_port
-  vault_address          = var.vault_address
-  vault_token            = var.vault_token
-  enable_https           = false
-  ssl_certificate_arn    = ""
-  kms_key_id             = module.security.kms_key_id
-  enable_deletion_protection = true
-  log_retention_days     = 30
-  common_tags            = local.common_tags
+	name_prefix            = local.name_prefix
+	environment            = local.environment
+	aws_region             = data.aws_region.current.name
+	vpc_id                 = module.networking.vpc_id
+	public_subnet_ids      = module.networking.public_subnet_ids
+	private_subnet_ids     = module.networking.private_subnet_ids
+	alb_security_group_id  = module.security.alb_security_group_id
+	app_security_group_id  = module.security.mlflow_app_security_group_id
+	ami_id                 = data.aws_ami.amazon_linux.id
+	instance_type          = "t3.large"
+	key_name               = aws_key_pair.mlflow_key.key_name
+	instance_profile_name  = module.security.mlflow_instance_profile_name
+	min_capacity           = 2
+	max_capacity           = 4
+	desired_capacity       = 2
+	s3_bucket_name         = "${local.name_prefix}-artifacts-${random_id.bucket_suffix.hex}"
+	database_connection_string = module.database.database_connection_string
+	elasticache_endpoint   = module.database.elasticache_endpoint
+	elasticache_port       = module.database.elasticache_port
+	vault_address          = var.vault_address
+	vault_token            = var.vault_token
+	enable_https           = false
+	ssl_certificate_arn    = ""
+	kms_key_id             = module.security.kms_key_id
+	kms_key_arn            = module.security.kms_key_arn
+	enable_deletion_protection = true
+	log_retention_days     = 30
+	common_tags            = local.common_tags
 
-  depends_on = [module.networking, module.security, module.database]
+	depends_on = [module.networking, module.security, module.database]
 }
 
 resource "aws_sns_topic" "alerts" {
-  name              = "${local.name_prefix}-alerts"
-  kms_master_key_id = module.security.kms_key_id
-  tags = local.common_tags
+	name              = "${local.name_prefix}-alerts"
+	kms_master_key_id = module.security.kms_key_arn
+	tags = local.common_tags
 }
 
 module "monitoring" {
-  source = "../../modules/monitoring"
+	source = "../../modules/monitoring"
 
-  name_prefix            = local.name_prefix
-  environment            = local.environment
-  alb_arn_suffix         = module.mlflow.load_balancer_arn_suffix
-  autoscaling_group_name = module.mlflow.autoscaling_group_name
-  rds_instance_id        = module.database.rds_instance_id
-  elasticache_cluster_id = coalesce(module.database.elasticache_replication_group_id, "")
-  cloudwatch_log_group   = module.mlflow.cloudwatch_log_group_name
-  sns_topic_arn          = aws_sns_topic.alerts.arn
-  slack_webhook_url      = try(data.vault_generic_secret.monitoring.data["slack_webhook"], "")
-  cpu_threshold_high     = 80
-  cpu_threshold_low      = 20
-  memory_threshold       = 85
-  disk_threshold         = 90
-  response_time_threshold = 5000
-  error_rate_threshold   = 10
-  common_tags            = local.common_tags
+	name_prefix            = local.name_prefix
+	environment            = local.environment
+	alb_arn_suffix         = module.mlflow.load_balancer_arn_suffix
+	autoscaling_group_name = module.mlflow.autoscaling_group_name
+	rds_instance_id        = module.database.rds_instance_id
+	elasticache_cluster_id = coalesce(module.database.elasticache_replication_group_id, "")
+	cloudwatch_log_group   = module.mlflow.cloudwatch_log_group_name
+	sns_topic_arn          = aws_sns_topic.alerts.arn
+	slack_webhook_url      = try(data.vault_generic_secret.monitoring.data["slack_webhook"], "")
+	cpu_threshold_high     = 80
+	cpu_threshold_low      = 20
+	memory_threshold       = 85
+	disk_threshold         = 90
+	response_time_threshold = 5000
+	error_rate_threshold   = 10
+	common_tags            = local.common_tags
 
-  depends_on = [module.mlflow, module.database]
+	depends_on = [module.mlflow, module.database]
 }

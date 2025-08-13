@@ -283,12 +283,40 @@ resource "aws_iam_role_policy_attachment" "mlflow_ssm_managed_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# IAM policy for EC2 Serial Console access (for debugging in private subnets)
+resource "aws_iam_role_policy" "mlflow_serial_console_policy" {
+  name = "${var.name_prefix}-mlflow-serial-console-policy"
+  role = aws_iam_role.mlflow_instance_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:GetSerialConsoleAccessStatus",
+          "ec2:EnableSerialConsoleAccess",
+          "ec2:DisableSerialConsoleAccess",
+          "ec2:GetConsoleOutput",
+          "ec2:GetConsoleScreenshot"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # IAM Instance Profile
 resource "aws_iam_instance_profile" "mlflow_instance_profile" {
   name_prefix = "${var.name_prefix}-mlflow-instance"
   role        = aws_iam_role.mlflow_instance_role.name
 
   tags = var.common_tags
+}
+
+# Enable EC2 Serial Console access for the account (for debugging private subnet instances)
+resource "aws_ec2_serial_console_access" "mlflow" {
+  enabled = true
 }
 
 # KMS Key for encryption

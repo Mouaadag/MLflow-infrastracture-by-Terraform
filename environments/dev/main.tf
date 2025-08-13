@@ -146,7 +146,7 @@ module "mlflow" {
 	alb_security_group_id  = module.security.alb_security_group_id
 	app_security_group_id  = module.security.mlflow_app_security_group_id
 	ami_id                 = data.aws_ami.amazon_linux.id
-	instance_type          = "t3.micro"
+	instance_type          = "t3.medium"
 	key_name               = aws_key_pair.mlflow_key.key_name
 	instance_profile_name  = module.security.mlflow_instance_profile_name
 	min_capacity           = 1
